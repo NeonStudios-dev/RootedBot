@@ -12,7 +12,13 @@ using IHost host = Host.CreateDefaultBuilder(args)
     })
     .ConfigureServices(services =>
     {
-        services.AddSingleton<DiscordSocketClient>();       // Add the discord client to services
+        services.AddSingleton(new DiscordSocketClient(new DiscordSocketConfig
+        {
+            GatewayIntents = Discord.GatewayIntents.Guilds | 
+                            Discord.GatewayIntents.GuildMembers | 
+                            Discord.GatewayIntents.GuildMessages | 
+                            Discord.GatewayIntents.MessageContent
+        }));       // Add the discord client to services with proper intents
         services.AddSingleton<InteractionService>();        // Add the interaction service to services
         services.AddHostedService<InteractionHandlingService>();    // Add the slash command handler
         services.AddHostedService<DiscordStartupService>();         // Add the discord startup service
