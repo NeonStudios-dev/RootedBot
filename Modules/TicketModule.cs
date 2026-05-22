@@ -6,7 +6,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Threading.Tasks;
-
+using System.Linq;
 namespace RootedBot.Modules
 {
     public class TicketModule : InteractionModuleBase<SocketInteractionContext>
@@ -94,6 +94,9 @@ namespace RootedBot.Modules
                     .AddField("Dev Mode", dump.DevMode, inline: true)
                     .AddField("First Run", dump.FirstRun, inline: true)
                     .AddField("Install Path", $"`{dump.InstallPath}`", inline: false);
+                    AddCrashFields(embedBuilder, dump);
+
+
             }
             else
             {
@@ -195,6 +198,44 @@ namespace RootedBot.Modules
 
             await RespondAsync(embed: embed, components: closeButton);
         }
+
+        private static void AddCrashFields(EmbedBuilder embed, DumpInfo dump)
+        {
+            if (!dump.HasCrashes)
+            {
+                embed.AddField("Crash Logs", " No errors or crashes found in dump.", inline: false);
+                return;
+            }
+
+            var shown = dump.CrashLogs.Take(3).ToList();
+
+            foreach (var entry in shown)
+            {
+                var summary = entry.Summary.Length > 900
+                    ? entry.Summary.Substring(0, 900) + "…"
+                    : entry.Summary;
+
+                var title = string.Format("⚠️ [{0}] {1}", entry.Level, entry.Category);
+                var body = string.Format("`{0}`\n{1}", entry.Timestamp, summary);
+
+                if (entry.ExitCode >= 0)
+                    body += string.Format("\nExit code: `{0}`", entry.ExitCode);
+
+                if (!string.IsNullOrWhiteSpace(entry.Session))
+                    body += string.Format("\nSession: `{0}`", entry.Session);
+
+                embed.AddField(title, body, inline: false);
+            }
+
+            if (dump.CrashLogs.Count > 3)
+            {
+                embed.AddField(
+                    "More entries",
+                    string.Format("…and {0} more error(s) in the dump file.", dump.CrashLogs.Count - 3),
+                    inline: false);
+            }
+        }
+
 
         // ─── Auto dump parser — fires on any message with an attachment ────────────
 
