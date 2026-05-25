@@ -16,10 +16,9 @@ namespace RootedBot.Modules
         // Tracks open tickets: userId -> channelId
         private static readonly ConcurrentDictionary<ulong, ulong> OpenTickets = new();
 
-        // ─── /ticket command ───────────────────────────────────────────────────────
 
-        [SlashCommand("ticket", "Open a support ticket. Optionally attach a Rooted dump file.")]
-        public async Task CreateTicket(IAttachment dumpFile = null)
+        [SlashCommand("ticket", "Run 'rooted dump' to get a dump file for better assistance ")]
+        public async Task CreateTicket([Summary("dumpFile", "Rooted dump file (required)")] IAttachment dumpFile)
         {
             await DeferAsync(ephemeral: true);
 
@@ -41,16 +40,10 @@ namespace RootedBot.Modules
 
             // Parse dump if attached
             DumpInfo dump = null;
-            if (dumpFile != null)
+            if (dumpFile == null)
             {
-                try
-                {
-                    using var http = new HttpClient();
-                    var content = await http.GetStringAsync(dumpFile.Url);
-                    if (DumpParser.IsRootedDump(content))
-                        dump = DumpParser.Parse(content);
-                }
-                catch { /* ignore parse failures, open ticket anyway */ }
+                await RespondAsync("You must attach a Rooted dump file to create a ticket.", ephemeral: true);
+                return;
             }
 
             // Create private channel
@@ -94,7 +87,7 @@ namespace RootedBot.Modules
                     .AddField("Dev Mode", dump.DevMode, inline: true)
                     .AddField("First Run", dump.FirstRun, inline: true)
                     .AddField("Install Path", $"`{dump.InstallPath}`", inline: false);
-                    AddCrashFields(embedBuilder, dump);
+                AddCrashFields(embedBuilder, dump);
 
 
             }
