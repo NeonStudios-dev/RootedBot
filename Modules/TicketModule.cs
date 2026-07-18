@@ -190,8 +190,38 @@ namespace RootedBot.Modules
                 }
             }
 
+            if (transcriptPath != null)
+            {
+                var owner = GetTicketOwner(channel);
+                if (owner != null)
+                {
+                    try
+                    {
+                        var dm = await owner.CreateDMChannelAsync();
+                        await dm.SendFileAsync(
+                            transcriptPath,
+                            text: $"Here's the transcript from your ticket **{channel.Name}**.");
+                    }
+                    catch
+                    {
+                        // DMs closed or blocked — nothing more we can do
+                        await FollowupAsync($"⚠️ Couldn't DM the transcript to {owner.Mention} (DMs may be closed).");
+                    }
+                }
+            }
+
             await Task.Delay(5000);
             await channel.DeleteAsync();
+        }
+
+        private static SocketGuildUser GetTicketOwner(SocketTextChannel channel)
+        {
+            var overwrite = channel.PermissionOverwrites
+                .FirstOrDefault(o => o.TargetType == PermissionTarget.User && o.TargetId != SupportRoleId);
+
+            return overwrite.TargetId != default
+                ? channel.Guild.GetUser(overwrite.TargetId)
+                : null;
         }
 
         private static async Task<string> SaveTranscriptAsync(SocketTextChannel channel)
