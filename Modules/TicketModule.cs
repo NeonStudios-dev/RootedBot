@@ -4,7 +4,10 @@ using Discord.WebSocket;
 using RootedBot.Utility;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.IO;
 using System.Net.Http;
+using System.Text;
 using System.Threading.Tasks;
 using System.Linq;
 namespace RootedBot.Modules
@@ -156,12 +159,74 @@ namespace RootedBot.Modules
             await RespondAsync("Are you sure you want to close this ticket?", components: confirmButtons, ephemeral: false);
         }
 
+        // Set this to a real channel ID to also post transcripts there. 0 = skip.
+        private const ulong TranscriptLogChannelId = 0UL;
+
         [ComponentInteraction("ticket_close_confirm")]
         public async Task CloseTicketConfirm()
         {
-            await RespondAsync("Closing ticket in 5 seconds...");
+            var channel = (SocketTextChannel)Context.Channel;
+
+            await RespondAsync("Saving transcript and closing ticket in 5 seconds...");
+
+            string transcriptPath = null;
+            try
+            {
+                transcriptPath = await SaveTranscriptAsync(channel);
+            }
+            catch (Exception ex)
+            {
+                await FollowupAsync($"⚠️ Failed to save transcript: {ex.Message}");
+            }
+
+            if (transcriptPath != null && TranscriptLogChannelId != 0UL)
+            {
+                var logChannel = Context.Guild.GetTextChannel(TranscriptLogChannelId);
+                if (logChannel != null)
+                {
+                    await logChannel.SendFileAsync(
+                        transcriptPath,
+                        text: $"Transcript for {channel.Name} (closed by {Context.User.Mention})");
+                }
+            }
+
             await Task.Delay(5000);
-            await (Context.Channel as SocketTextChannel)!.DeleteAsync();
+            await channel.DeleteAsync();
+        }
+
+        private static async Task<string> SaveTranscriptAsync(SocketTextChannel channel)
+        {
+            var messages = new List<IMessage>();
+            await foreach (var page in channel.GetMessagesAsync(limit: 1000))
+                messages.AddRange(page);
+
+            var ordered = messages.OrderBy(m => m.Timestamp).ToList();
+
+            var sb = new StringBuilder();
+            sb.AppendLine($"Transcript for #{channel.Name}");
+            sb.AppendLine($"Generated: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
+            sb.AppendLine(new string('-', 60));
+
+            foreach (var msg in ordered)
+            {
+                sb.AppendLine($"[{msg.Timestamp:yyyy-MM-dd HH:mm:ss}] {msg.Author.Username}: {msg.Content}");
+
+                foreach (var attachment in msg.Attachments)
+                    sb.AppendLine($"    [attachment] {attachment.Filename} — {attachment.Url}");
+
+                foreach (var embed in msg.Embeds)
+                {
+                    if (!string.IsNullOrWhiteSpace(embed.Title) || !string.IsNullOrWhiteSpace(embed.Description))
+                        sb.AppendLine($"    [embed] {embed.Title}: {embed.Description}");
+                }
+            }
+
+            var dir = Path.Combine(AppContext.BaseDirectory, "transcripts");
+            Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, $"{channel.Name}-{DateTime.UtcNow:yyyyMMdd_HHmmss}.txt");
+            await File.WriteAllTextAsync(path, sb.ToString());
+
+            return path;
         }
 
         [ComponentInteraction("ticket_close_cancel")]
