@@ -46,6 +46,18 @@ namespace RootedBot.Modules
                 return;
             }
 
+            try
+            {
+                using var http = new HttpClient();
+                var content = await http.GetStringAsync(dumpFile.Url);
+                if (DumpParser.IsRootedDump(content))
+                    dump = DumpParser.Parse(content);
+            }
+            catch
+            {
+                // leave dump null; falls through to "could not be recognised" message
+            }
+
             // Create private channel
             var shortId = dump != null
                 ? (dump.TicketId.Length >= 8 ? dump.TicketId[..8] : dump.TicketId)
