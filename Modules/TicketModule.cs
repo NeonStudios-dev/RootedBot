@@ -224,6 +224,22 @@ namespace RootedBot.Modules
                 : null;
         }
 
+        private static string FindProjectRoot()
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+
+            while (dir != null)
+            {
+                if (dir.GetFiles("*.csproj").Length > 0)
+                    return dir.FullName;
+
+                dir = dir.Parent;
+            }
+
+            // No .csproj found (e.g. fully self-contained publish) — fall back to bin/
+            return AppContext.BaseDirectory;
+        }
+
         private static async Task<string> SaveTranscriptAsync(SocketTextChannel channel)
         {
             var messages = new List<IMessage>();
@@ -251,8 +267,8 @@ namespace RootedBot.Modules
                 }
             }
 
-            var dir = Path.Combine(AppContext.BaseDirectory, "transcripts");
-            Directory.CreateDirectory(dir);
+            var dir = Path.Combine(FindProjectRoot(), "transcripts");
+                Directory.CreateDirectory(dir);
             var path = Path.Combine(dir, $"{channel.Name}-{DateTime.UtcNow:yyyyMMdd_HHmmss}.txt");
             await File.WriteAllTextAsync(path, sb.ToString());
 
