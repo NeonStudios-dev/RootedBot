@@ -49,7 +49,7 @@ namespace RootedBot.Services
             // Look for .txt attachments
             foreach (var attachment in message.Attachments)
             {
-                if (!attachment.Filename.EndsWith(".txt")) continue;
+                if (!attachment.Filename.EndsWith(".txt") && !attachment.Filename.EndsWith(".rooteddump")) continue;
 
                 string content;
                 try
